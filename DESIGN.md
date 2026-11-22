@@ -504,8 +504,11 @@ let systems = try await sde.solarSystems()            // SolarSystemTable, synce
     one)
   - `all`
 - `SecurityStatus` display helper: `displayValue` (one decimal) and `band` (`.high` at ≥ 0.45,
-  `.low` above 0.0, `.null` at ≤ 0.0, `.wormhole` / `.pochven` by region). The in-game rounding
-  of values in (0, 0.05) still needs to be confirmed, see open questions.
+  `.low` above 0.0, `.null` at ≤ 0.0, `.wormhole` / `.pochven` by region). Values in (0, 0.05)
+  display as 0.1, confirmed in game on 2026-11-22 (Egbinger 0.0346 and Ennur 0.0583 show 0.1).
+- `SecurityStatus.displayColor` (0.1.1): the in-game colour per displayed tenth as an `RGBColor`,
+  measured from a client after Exordium (1.0 has its own colour). Not part of the SDE. Wormhole
+  space and Pochven were not measured and use the colour of their displayed value.
 - Later, when an app needs them: `Type` (from `types`, for ship names), `NPCStation`, `Region` and
   `Constellation`, added when an app needs them.
 
@@ -612,8 +615,8 @@ So 0.1 ships no ESIKit code. ESIKit arrives in 0.2, together with SSO.
 1. **User-Agent contact:** with a public repo, `+https://github.com/Crazor/CapsuleerKit` (the
    library) and the app's own URL are reachable contacts. Overseer's repo is private. Should
    Overseer's User-Agent carry a public URL, or only the product name plus the library's URL?
-2. **Security display rounding:** EVE shows values like 0.0346 (Egbinger) as 0.0 or 0.1? This
-   needs checking in game before the `SecurityStatus` helper is final.
+2. ~~**Security display rounding**~~ — resolved 2026-11-22: values above 0.0 and below 0.05
+   show as 0.1 in game (Egbinger 0.0346, Ennur 0.0583); Balle (0.4609) shows 0.5.
 3. **SDE stability:** CCP doesn't call the HTTP SDE beta or stable. Should SDEKit fall back to
    the zip export at `developers.eveonline.com/static-data` if the HTTP service goes away? The
    proposal is no fallback in 0.1; keep the stored table and report `isStale`.

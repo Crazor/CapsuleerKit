@@ -1,4 +1,5 @@
 import Foundation
+import CapsuleerCore
 
 /// A name in every language the SDE provides. English is always present.
 ///
@@ -103,8 +104,8 @@ public struct SecurityStatus: Sendable, Hashable {
     /// The value with one decimal, as shown in game.
     ///
     /// Rounded half up to one decimal, except that values greater than 0.0 and below 0.05 display
-    /// as 0.1, so they never read as null-sec. This rule matches common community understanding;
-    /// to be verified in game (DESIGN.md open question 2).
+    /// as 0.1, so they never read as null-sec. Confirmed in game on 2026-11-22: Egbinger (0.0346)
+    /// and Ennur (0.0583) show 0.1, Balle (0.4609) shows 0.5, NK-7XO (-0.0184) shows as null-sec.
     public var displayValue: Double
     /// `displayValue` formatted with one decimal, e.g. "0.5", "-0.1".
     public var formatted: String
@@ -131,6 +132,36 @@ public struct SecurityStatus: Sendable, Hashable {
     }
 
     /// The displayed value in tenths. See `displayValue` for the rule.
+    /// The colour the game uses for `displayValue`, e.g. in route and system displays.
+    ///
+    /// Measured from in-game displays on 2026-11-22, with a client after the Exordium release,
+    /// which gave 1.0 its own colour. These colours are not part of the SDE and may change with
+    /// future client releases. Only the regular tiers were measured: 1.0 down to 0.1, and one
+    /// colour for 0.0 and below (regular null-sec and Zarzakh). Wormhole space and Pochven were
+    /// not measured; they get the colour of their displayed value (in practice the 0.0 colour).
+    public var displayColor: RGBColor { Self.displayColor(forTenths: Int((displayValue * 10).rounded())) }
+
+    /// The in-game colour for a displayed value in tenths (10 = 1.0). Values above 10 use the
+    /// 1.0 colour; 0 and below use the null-sec colour. See `displayColor`.
+    public static func displayColor(forTenths tenths: Int) -> RGBColor {
+        displayColors[min(max(tenths, 0), 10)]
+    }
+
+    /// Index = displayed tenths, 0 (0.0 and below) through 10 (1.0).
+    private static let displayColors: [RGBColor] = [
+        RGBColor(red: 0x95, green: 0x4C, blue: 0x75), // 0.0 and below
+        RGBColor(red: 0x7E, green: 0x35, blue: 0x2E), // 0.1
+        RGBColor(red: 0xBB, green: 0x3C, blue: 0x2D), // 0.2
+        RGBColor(red: 0xCB, green: 0x63, blue: 0x31), // 0.3
+        RGBColor(red: 0xD7, green: 0x85, blue: 0x39), // 0.4
+        RGBColor(red: 0xF6, green: 0xFB, blue: 0xA3), // 0.5
+        RGBColor(red: 0x9D, green: 0xE4, blue: 0x7B), // 0.6
+        RGBColor(red: 0x90, green: 0xDC, blue: 0xB5), // 0.7
+        RGBColor(red: 0x83, green: 0xD3, blue: 0xF4), // 0.8
+        RGBColor(red: 0x65, green: 0xA9, blue: 0xE9), // 0.9
+        RGBColor(red: 0x50, green: 0x89, blue: 0xE2), // 1.0
+    ]
+
     static func displayTenths(_ value: Double) -> Int {
         if value > 0, value < 0.05 { return 1 }
         // Half up; the epsilon absorbs binary error so 0.45 (stored as 0.4499999…) still reaches 0.5.
