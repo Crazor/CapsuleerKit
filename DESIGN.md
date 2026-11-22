@@ -125,7 +125,7 @@ what it uses.
 |---|---|
 | `CapsuleerCore` | none |
 | `SDEKit` | none |
-| `ESIKit` | `apple/swift-openapi-runtime` and `apple/swift-openapi-urlsession` (Apache-2.0, both from Apple) |
+| `ESIKit` | `apple/swift-openapi-runtime` (≥ 1.13) and `apple/swift-http-types` (Apache-2.0, both from Apple). No `swift-openapi-urlsession`: `PipelineClientTransport` sends through the CapsuleerCore pipeline. The generator (1.14.4, pinned exactly) lives in the separate `Tools/` package. |
 | `capsuleer` CLI | `apple/swift-argument-parser` |
 
 In 0.1 the only dependency is `swift-argument-parser`, and only for the CLI. The library
@@ -306,7 +306,7 @@ public protocol HTTPTransport: Sendable {
 | Rate-limit buckets | `RateLimiter` actor, keyed by `(group, identity)`: the client ID plus character for authenticated calls, `public` otherwise. Seeded from `x-rate-limit` (max tokens, window) and corrected from each response's `X-Ratelimit-Remaining` / `-Used`. ESI's token cost is 2XX = 2, 3XX = 1, 4XX = 5, 5XX = 0. When remaining tokens fall below a reserve (default 10 %), requests are spaced out over the window instead of bursting. Operations without a group are limited only by the error budget. |
 | Error-limit budget | `ErrorBudget` actor shared by all calls. It tracks `X-Esi-Error-Limit-Remain` and `-Reset`. At or below a floor (default 10), every request waits until the reset. A 420 response sets the budget to 0 until the reset. |
 | `Retry-After` | On 429 or 503: wait the given time, then retry at most once. If the wait is longer than the caller's deadline, throw `.rateLimited(retryAfter:)` instead. |
-| No blind 4XX retries | 400/401/403/404/422 and every other 4XX are never retried. A 401 on an authenticated call triggers one token refresh and one retry, and only if the token was close to expiry. |
+| No blind 4XX retries | 400/401/403/404/422 and every other 4XX are never retried. A 401 on an authenticated call invalidates the access token, gets a new one and retries exactly once. If the fresh token is rejected too, the 401 is thrown and further 401s for that character are thrown without refresh or retry for `unauthorizedCooldown` (default 5 min), so a locked account can't drain the shared error budget. A successful call ends the cooldown. |
 | 5XX and network errors | At most 2 retries with exponential backoff and jitter (1 s, 3 s), only for idempotent GETs and for the POSTs ESI documents as lookups (`/universe/ids`, `/universe/names`). |
 | Pagination (`X-Pages`) | `pages(...)` fetches page 1, then pages 2…N with bounded concurrency (default 3). All pages must report the same `Last-Modified`. If they don't, the data changed mid-read, and the whole set is refetched, up to 2 times, before throwing `.inconsistentPages`. It returns `Response<[T]>`. Built in 0.2, or when the first paged endpoint arrives. |
 | Concurrent duplicates | Identical in-flight requests (same cache key) are coalesced into one network call. |
@@ -326,10 +326,12 @@ let info = try await esi.characters.publicInfo(2112345678)   // GET /characters/
 
 Planned next, when an app needs them:
 
-- `POST /universe/ids` and `POST /universe/names`
-  - Batches of at most 500 items; longer lists are split and the results merged.
-  - Resolved names are cached for 12 hours (ESI's documented server cache), unresolved names for
-    1 hour.
+- `POST /universe/names` (0.2): batches of at most 1000 IDs (the spec's `maxItems`); resolved
+  names are cached per ID for 30 days, in process and in the cache store, so station names work
+  offline. A batch with one invalid ID returns 404 for the whole batch; it is not split.
+- `POST /universe/ids` (0.2): batches of at most 500 names; only exact (case-insensitive) name
+  matches are returned, since ESI also matches tickers. Resolved names are cached 12 hours,
+  unresolved ones 1 hour.
 - `EVEImages.characterPortrait(id, size:)`, a URL helper for CCP's image server
   (`https://images.evetech.net/characters/{id}/portrait?size=…`). The app loads and caches the
   image itself.
@@ -392,8 +394,12 @@ an internal `SignatureVerifier`. There is no JWT dependency. The checks:
 
 - Every character is an independent `AuthorizedCharacter`, holding the ID, name, owner hash,
   granted scopes and state (`.active` or `.needsReauthentication(reason)`).
-- Each character can be authorized with its own scopes. Calling `authorize(scopes:)` again for a
-  character that already exists merges the scopes and replaces its token.
+- Each character can be authorized with its own scopes. EVE grants exactly the scopes in the
+  authorize URL, and which character logs in is only known afterwards, so
+  `authorize(scopes:mergingWith:)` adds a known character's stored scopes to the request. The
+  stored scopes are always the new token's `scp` claim; the replaced refresh token is revoked.
+- A character that needs re-authentication stays stored with an empty refresh token and state
+  `.needsReauthentication(reason)`, so apps can list it and offer a new login.
 - Before sending, an endpoint call checks the operation's required scopes (from
   `OperationMetadata`) against the character's granted scopes. A missing scope throws
   `.missingScope(…)` without making a network request.
@@ -403,7 +409,7 @@ an internal `SignatureVerifier`. There is no JWT dependency. The checks:
 - `TokenStore` protocol, with these implementations:
   - `KeychainTokenStore(service:accessGroup:)`: a generic password item per character, holding
     the refresh token, owner hash and scopes.
-  - `InMemoryTokenStore`, for tests.
+  - `InMemoryTokenStore` (public, in ESIKit), for tests.
   - `FileTokenStore(url:)`, in the CLI target only (not a library product). It is a JSON file
     with mode 0600, used by the live test runner.
 - Access tokens (about 20 minutes) are kept in memory only.
@@ -458,7 +464,7 @@ let online = try await me.online()     // online, last_login, last_logout
 - Cancellation is honoured everywhere, including while waiting on the rate limiter.
 - **Testability:**
   - `CapsuleerKitTesting` provides `MockTransport` (fixture replay plus request assertions),
-    `FixtureRecorder`, `InMemoryTokenStore`, `MemoryCacheStore` and a controllable `Clock`
+    `MemoryCacheStore` and a controllable `ManualTimeSource`
     injected into the cache, the limiter and the token manager.
   - Fixtures are recorded from live public endpoints by `Scripts/record-fixtures.sh`. SSO
     fixtures are hand-written with a test JWKS key pair.
