@@ -11,6 +11,9 @@ break is listed here.
 - `SSOConfiguration.isAcceptedCallbackURL(_:)`: the callback URL rules of developers.eveonline.com.
 
 ### Fixed
+- `WebAuthenticationSession` crashed (`dispatch_assert_queue_fail`) when
+  `ASWebAuthenticationSession` called back off the main thread, as it does on its early-failure
+  path. Completions now hop to the main actor, and the presentation anchor is captured up front.
 - `WebAuthenticationSession` refuses custom schemes EVE doesn't accept (they must start with
   `eveauth`), and the docs use `eveauth-…://callback` instead of the invalid `overseer://` examples.
 - `LoopbackAuthorizationSession` waits until its listener has released the port before

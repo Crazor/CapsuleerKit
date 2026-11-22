@@ -44,12 +44,20 @@ public struct WebAuthenticationSession: AuthorizationSession {
 }
 
 /// Owns one `ASWebAuthenticationSession` (kept alive until it completes) and its continuation.
+///
+/// `ASWebAuthenticationSession` does not reliably call back on the main thread: on its early
+/// failure path (`_startDryRun:`) the completion arrives on an XPC reply queue (seen on macOS 15
+/// in an LSUIElement app). Completions therefore hop to the main actor instead of assuming it,
+/// and the presentation anchor is captured on the main actor before the session starts.
 @MainActor
-private final class WebAuthenticationRunner: NSObject, ASWebAuthenticationPresentationContextProviding {
+final class WebAuthenticationRunner: NSObject, ASWebAuthenticationPresentationContextProviding {
     private let presentationAnchor: WebAuthenticationSession.PresentationAnchorProvider
     private var session: ASWebAuthenticationSession?
     private var continuation: CheckedContinuation<URL, any Error>?
     private var isCancelled = false
+    /// Captured on the main actor in `run`; read by `presentationAnchor(for:)` from whatever
+    /// thread the system calls it on. The window is only handed back to AuthenticationServices.
+    nonisolated(unsafe) private var anchor: ASPresentationAnchor?
 
     init(presentationAnchor: @escaping WebAuthenticationSession.PresentationAnchorProvider) {
         self.presentationAnchor = presentationAnchor
@@ -62,10 +70,9 @@ private final class WebAuthenticationRunner: NSObject, ASWebAuthenticationPresen
                 return
             }
             self.continuation = continuation
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme) { [weak self] callback, error in
-                // ASWebAuthenticationSession calls back on the main queue.
-                MainActor.assumeIsolated { self?.complete(callback, error) }
-            }
+            anchor = presentationAnchor()
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: callbackScheme,
+                                                     completionHandler: makeCompletionHandler())
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = true
             self.session = session
@@ -75,13 +82,20 @@ private final class WebAuthenticationRunner: NSObject, ASWebAuthenticationPresen
         }
     }
 
+    /// The session's completion handler: safe to call on any thread or queue.
+    nonisolated func makeCompletionHandler() -> @Sendable (URL?, (any Error)?) -> Void {
+        { [weak self] callback, error in
+            Task { @MainActor in self?.complete(callback, error) }
+        }
+    }
+
     func cancel() {
         isCancelled = true
         session?.cancel()
         complete(nil, CapsuleerError(.cancelled, message: "Login cancelled"))
     }
 
-    private func complete(_ callback: URL?, _ error: (any Error)?) {
+    func complete(_ callback: URL?, _ error: (any Error)?) {
         guard let continuation else { return }
         self.continuation = nil
         session = nil
@@ -97,7 +111,17 @@ private final class WebAuthenticationRunner: NSObject, ASWebAuthenticationPresen
     }
 
     nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated { presentationAnchor() }
+        if let anchor { return anchor }
+        if Thread.isMainThread { return MainActor.assumeIsolated { presentationAnchor() } }
+        return DispatchQueue.main.sync { MainActor.assumeIsolated { presentationAnchor() } }
     }
+
+    /// For tests: parks a continuation as `run` does, without starting a system session.
+    func runForTesting() async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation = $0 }
+    }
+
+    /// For tests: wait until a pending completion has been delivered.
+    var hasPendingContinuation: Bool { continuation != nil }
 }
 #endif

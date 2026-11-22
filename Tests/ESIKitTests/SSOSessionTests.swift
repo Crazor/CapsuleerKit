@@ -114,6 +114,23 @@ private func freeLoopbackPort() throws -> UInt16 {
 #if canImport(AuthenticationServices) && canImport(AppKit)
 import AppKit
 @Suite struct SSOWebAuthenticationSessionTests {
+    /// Regression: ASWebAuthenticationSession may call its completion handler off the main thread
+    /// (early-failure path); that must not trap in `MainActor.assumeIsolated`.
+    @MainActor @Test func completionOffTheMainThreadIsDelivered() async throws {
+        let runner = WebAuthenticationRunner { NSWindow() }
+        let handler = runner.makeCompletionHandler()
+        let result = Task { @MainActor in
+            try await runner.runForTesting()
+        }
+        for _ in 0..<100 where !runner.hasPendingContinuation { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(runner.hasPendingContinuation)
+        DispatchQueue.global().async {
+            handler(URL(string: "eveauth-overseer://callback?code=c&state=s"), nil)
+        }
+        let url = try await result.value
+        #expect(url.query == "code=c&state=s")
+    }
+
     @MainActor @Test func rejectsSchemesEVEDoesNotAccept() async {
         let session = WebAuthenticationSession { NSWindow() }
         let error = await #expect(throws: CapsuleerError.self) {
