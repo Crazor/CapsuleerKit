@@ -344,7 +344,7 @@ Planned next, when an app needs them:
 ```swift
 let sso = SSOConfiguration(
     clientID: "…",                                     // from developers.eveonline.com
-    callbackURL: URL(string: "overseer://sso-callback")!,
+    callbackURL: URL(string: "eveauth-overseer://callback")!,
     defaultScopes: [.locationRead, .shipTypeRead, .onlineRead])
 ```
 
@@ -623,3 +623,4 @@ So 0.1 ships no ESIKit code. ESIKit arrives in 0.2, together with SSO.
 | D17 | Authenticated live tests | Written in 0.2 and run locally (`capsuleer login`, `CAPSULEER_LIVE_AUTH=1`); the isolated self-hosted runner is a follow-up after 0.2 | Setting up Tart or a Linux container runner inside 0.2. |
 | D18 | Rate-limit plumbing | ESIKit passes the spec's rate-limit group, identity and idempotency to `ESIEtiquetteTransport` as internal request headers (`X-CapsuleerKit-*`), which the transport strips before sending | Task-locals: implicit and fragile across the coalescing task. |
 | D19 | JWT keys | Verify both RS256 and ES256, since EVE's JWKS publishes both | RS256 only. |
+| D20 | Callback URLs | Follow developers.eveonline.com's rules: `https`, `http` for localhost only, or a custom scheme `eveauth[a-z0-9+.-]*` ending in a letter or digit (Overseer: `eveauth-overseer://callback`). `SSOConfiguration.isAcceptedCallbackURL(_:)` checks this, and `WebAuthenticationSession` refuses other schemes before opening the sheet. | Any custom scheme: the portal rejects it at registration. |

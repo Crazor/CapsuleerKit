@@ -4,7 +4,7 @@ import CapsuleerCore
 import Foundation
 
 /// Runs the SSO login in `ASWebAuthenticationSession`, with an ephemeral browser session so each
-/// login can pick a different character. For custom-scheme callbacks (`overseer://sso-callback`).
+/// login can pick a different character. For custom-scheme callbacks (`eveauth-overseer://callback`).
 ///
 /// Create it on the main actor with a closure that returns the window to present from:
 ///
@@ -30,6 +30,9 @@ public struct WebAuthenticationSession: AuthorizationSession {
     public func start(authorizeURL: URL, callbackURL: URL) async throws -> URL {
         guard let scheme = callbackURL.scheme?.lowercased(), scheme != "http", scheme != "https" else {
             throw CapsuleerError(.ssoFailed, message: "WebAuthenticationSession needs a custom-scheme callback URL; use LoopbackAuthorizationSession for http callbacks")
+        }
+        guard let rawScheme = callbackURL.scheme, SSOConfiguration.isAcceptedCustomScheme(rawScheme) else {
+            throw CapsuleerError(.ssoFailed, message: "EVE SSO only accepts custom callback schemes that start with \"eveauth\" (e.g. eveauth-myapp://callback); got \(callbackURL.scheme ?? "none")")
         }
         let runner = await WebAuthenticationRunner(presentationAnchor: presentationAnchor)
         return try await withTaskCancellationHandler {

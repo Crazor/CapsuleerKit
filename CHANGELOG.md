@@ -7,7 +7,12 @@ break is listed here.
 
 ## [Unreleased]
 
+### Added
+- `SSOConfiguration.isAcceptedCallbackURL(_:)`: the callback URL rules of developers.eveonline.com.
+
 ### Fixed
+- `WebAuthenticationSession` refuses custom schemes EVE doesn't accept (they must start with
+  `eveauth`), and the docs use `eveauth-…://callback` instead of the invalid `overseer://` examples.
 - `LoopbackAuthorizationSession` waits until its listener has released the port before
   returning, so a login retried right after a timeout can bind the same port again.
 

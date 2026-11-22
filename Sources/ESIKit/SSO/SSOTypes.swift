@@ -5,8 +5,9 @@ import Foundation
 public struct SSOConfiguration: Sendable, Hashable {
     /// Client ID from developers.eveonline.com. Native apps use PKCE and have no secret.
     public var clientID: String
-    /// Callback URL registered for the app: a custom scheme (`overseer://sso-callback`) or a
+    /// Callback URL registered for the app: a custom scheme (`eveauth-overseer://callback`) or a
     /// loopback URL (`http://127.0.0.1:8635/callback`). Redirects are matched against it exactly.
+    /// developers.eveonline.com only accepts URLs that pass `isAcceptedCallbackURL(_:)`.
     public var callbackURL: URL
     /// Scopes requested when `authorize(scopes:)` is called without explicit scopes.
     public var defaultScopes: Set<ESIScope>
@@ -19,6 +20,32 @@ public struct SSOConfiguration: Sendable, Hashable {
         self.callbackURL = callbackURL
         self.defaultScopes = defaultScopes
         self.loginBaseURL = loginBaseURL
+    }
+
+    /// Whether developers.eveonline.com accepts `url` as a callback URL (rules shown by the portal,
+    /// checked 2026-11-22): `https`; `http` only for localhost (`localhost`, `127.0.0.1`, `[::1]`);
+    /// or a custom scheme that starts with `eveauth`, continues with lower-case letters, digits,
+    /// `+`, `.` or `-`, and ends in a letter or digit (e.g. `eveauth-myapp://callback`).
+    public static func isAcceptedCallbackURL(_ url: URL) -> Bool {
+        guard let scheme = url.scheme else { return false }
+        switch scheme.lowercased() {
+        case "https":
+            return url.host != nil
+        case "http":
+            return ["localhost", "127.0.0.1", "::1", "[::1]"].contains(url.host?.lowercased() ?? "")
+        default:
+            return isAcceptedCustomScheme(scheme)
+        }
+    }
+
+    /// `eveauth`, optionally followed by `[a-z0-9+.-]*` ending in `[a-z0-9]`. Case-sensitive, as on the portal.
+    static func isAcceptedCustomScheme(_ scheme: String) -> Bool {
+        guard scheme.hasPrefix("eveauth") else { return false }
+        let rest = scheme.dropFirst("eveauth".count)
+        guard let last = rest.last else { return true }
+        let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789+.-")
+        let alnum = Set("abcdefghijklmnopqrstuvwxyz0123456789")
+        return rest.allSatisfy { allowed.contains($0) } && alnum.contains(last)
     }
 }
 

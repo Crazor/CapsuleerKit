@@ -89,7 +89,7 @@ private func freeLoopbackPort() throws -> UInt16 {
         let session = LoopbackAuthorizationSession(port: 8635) { _ in Issue.record("must not open the browser") }
         await #expect(throws: CapsuleerError.self) {
             try await session.start(authorizeURL: URL(string: "https://login.eveonline.com/")!,
-                                    callbackURL: URL(string: "overseer://sso-callback")!)
+                                    callbackURL: URL(string: "eveauth-overseer://callback")!)
         }
         await #expect(throws: CapsuleerError.self) {
             try await session.start(authorizeURL: URL(string: "https://login.eveonline.com/")!,
@@ -114,6 +114,26 @@ private func freeLoopbackPort() throws -> UInt16 {
 #if canImport(AuthenticationServices) && canImport(AppKit)
 import AppKit
 @Suite struct SSOWebAuthenticationSessionTests {
+    @MainActor @Test func rejectsSchemesEVEDoesNotAccept() async {
+        let session = WebAuthenticationSession { NSWindow() }
+        let error = await #expect(throws: CapsuleerError.self) {
+            try await session.start(authorizeURL: URL(string: "https://login.eveonline.com/")!,
+                                    callbackURL: URL(string: "overseer://sso-callback")!)
+        }
+        #expect(error?.code == .ssoFailed)
+        #expect(error?.message?.contains("eveauth") == true)
+    }
+
+    @Test(arguments: [
+        ("eveauth-overseer://callback", true), ("eveauth://callback", true), ("eveauth.my+app-2://x", true),
+        ("https://example.com/callback", true), ("http://127.0.0.1:8635/callback", true), ("http://localhost:8080/cb", true),
+        ("overseer://sso-callback", false), ("eveauth-://callback", false), ("eveauth-app.://callback", false),
+        ("eveauthApp://callback", false), ("http://example.com/callback", false), ("myeveauth://x", false),
+    ])
+    func callbackURLsEVEAccepts(url: String, accepted: Bool) throws {
+        #expect(SSOConfiguration.isAcceptedCallbackURL(try #require(URL(string: url))) == accepted)
+    }
+
     @MainActor @Test func rejectsHTTPCallbacks() async {
         let session = WebAuthenticationSession { NSWindow() }
         let error = await #expect(throws: CapsuleerError.self) {

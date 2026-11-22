@@ -12,7 +12,7 @@ import CapsuleerKitTesting
 
 let ssoLoginBase = URL(string: "https://login.eveonline.com")!
 let ssoClientID = "test-client-id"
-let ssoCallback = URL(string: "overseer://sso-callback")!
+let ssoCallback = URL(string: "eveauth-overseer://callback")!
 let ssoUserAgent = UserAgent(product: "Tests", version: "1.0", contact: "+https://example.com/tests")
 
 /// Test signing keys and their JWKS representation.
