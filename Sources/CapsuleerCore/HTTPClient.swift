@@ -74,7 +74,8 @@ public final class HTTPClient: Sendable {
         } catch {
             let mapped = Self.map(error, url: request.url)
             if error is CancellationError {
-                // This caller stopped waiting; the shared request (if any) carries on.
+                // This caller stopped waiting; the shared request carries on while others
+                // still wait, and is cancelled when this was its last waiter.
                 emit(ClientEvent(kind: .requestFailed, url: request.url, error: mapped))
             }
             throw mapped
