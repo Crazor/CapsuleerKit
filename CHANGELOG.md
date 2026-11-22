@@ -7,6 +7,10 @@ break is listed here.
 
 ## [0.2.0] - Unreleased
 
+### Changed
+- Building CapsuleerKit now needs Swift 6.2 (Xcode 26), because ESIKit depends on
+  swift-openapi-runtime 1.13 or later.
+
 ### Added
 - **ESIKit**: client for CCP's ESI at compatibility date 2026-11-19.
   - Endpoints: `character(id).publicInfo()`, `.location()`, `.ship()`, `.online()`;

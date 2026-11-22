@@ -151,7 +151,8 @@ needs it; the code uses no AppKit, so adding `.iOS(.v16)` and an iOS CI job is a
 
 **Language:** Swift 6 language mode with strict concurrency, chosen for compile-time data-race
 checking in the cache, the rate limiter and token refresh. No other Swift 6 feature is required.
-Building the package needs Xcode 16 or later; Overseer can stay in Swift 5 mode.
+Building the package needs Xcode 26 (Swift 6.2), because swift-openapi-runtime 1.13+ requires
+it; Overseer can stay in Swift 5 language mode.
 
 **Licence:** MIT, matching Overseer. The README carries CCP's notice: EVE Online and the EVE
 logo are registered trademarks of CCP hf., and the project is not affiliated with or endorsed by
