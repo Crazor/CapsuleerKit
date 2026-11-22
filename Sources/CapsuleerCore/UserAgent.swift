@@ -2,7 +2,7 @@ import Foundation
 
 /// The library's version, appended to every User-Agent.
 public enum CapsuleerKitInfo {
-    public static let version = "0.2.1"
+    public static let version = "0.2.2"
 }
 
 /// Identifies the calling app. CapsuleerKit appends its own name, version and the OS.
