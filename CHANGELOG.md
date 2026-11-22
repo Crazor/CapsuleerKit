@@ -30,5 +30,5 @@ break is listed here.
   - Single-record lookup.
 - **CapsuleerKitTesting**: `MockTransport` and `ManualTimeSource`.
 - `capsuleer` example CLI with `capsuleer sde system <name|id>`.
-- CI on macOS for every push and pull request, an iOS Simulator build on `main`, weekly live
+- CI on macOS for every push and pull request, weekly live
   tests, and a weekly upstream watch of the SDE against `Spec/pins.json`.

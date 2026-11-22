@@ -71,7 +71,7 @@ These facts drive the design. All were checked live on 2026-11-22.
 - Offline-first static data: each piece is looked up once, then served from disk.
 - SSO for native apps with several characters and safe token handling (built in 0.2, designed
   now so 0.2 needs no breaking changes).
-- macOS and iOS. Linux is deferred, but the code keeps the seams that make it cheap to add (§3).
+- macOS. iOS and Linux are deferred, but the code keeps the seams that make it cheap to add (§3).
 
 **Non-goals**
 
@@ -131,7 +131,8 @@ what it uses.
 In 0.1 the only dependency is `swift-argument-parser`, and only for the CLI. The library
 products have none.
 
-**Platforms:** macOS 13 and iOS 16. macOS 13 matches Overseer's deployment target.
+**Platforms:** macOS 13, matching Overseer's deployment target. iOS is deferred until an app
+needs it; the code uses no AppKit, so adding `.iOS(.v16)` and an iOS CI job is all it takes.
 
 **Linux is deferred,** but the code stays easy to port:
 
@@ -515,7 +516,6 @@ let systems = try await sde.solarSystems()            // SolarSystemTable, synce
 | Layer | Where | Runs |
 |---|---|---|
 | Unit tests (`MockTransport`, controllable clock, fixtures, test JWKS key pair) | `Tests/*Tests` | Every push and PR, GitHub-hosted macOS runner (free for public repos) |
-| iOS build | — | Every push to `main` and every release tag, `xcodebuild` for the iOS Simulator |
 | Live public tests (SDE manifest and record, `GET /characters/{id}`, header and etiquette assertions) | `Tests/LiveTests` | Nightly or weekly, plus manual runs |
 | Live authenticated tests (refresh, `location`, `ship`, `online`, scope checks, revoke handling) | `Tests/LiveTests` | Nightly or weekly, plus manual runs, **self-hosted runner only** |
 
@@ -596,7 +596,7 @@ So 0.1 ships no ESIKit code. ESIKit arrives in 0.2, together with SSO.
 | D2 | ESI and SDE in one package | **One package, separate modules** | Two packages would duplicate the transport and cache or need a third package. |
 | D3 | Static data source | **SDE over HTTP** | ESI `/universe/systems` (removed at 2026-11-19); pinning an old compatibility date (no end date published). |
 | D4 | ESI endpoint layer | **swift-openapi-generator, output committed, internal, wrapped by a hand-written facade** | Build plugin: Xcode trust prompt, slower builds, consumers resolve the generator. Fully hand-written: scales badly. |
-| D5 | Platforms | **macOS 13 and iOS 16; Linux deferred to 0.2**, with porting seams kept | Linux in 0.1: extra CI and Foundation differences, with no consumer and no CI cost benefit on a public repo. |
+| D5 | Platforms | **macOS 13; iOS and Linux deferred**, with porting seams kept | Linux in 0.1: extra CI and Foundation differences, with no consumer and no CI cost benefit on a public repo. |
 | D6 | SSO redirect | **Supplied by the app.** Overseer: a custom URL scheme via `ASWebAuthenticationSession`. CLI: loopback. | Loopback for Overseer: needs a fixed registered port and a local listener. |
 | D7 | Scope of 0.1 | **SDE only:** CapsuleerCore + SDEKit (solar systems). ESIKit is designed now and built in 0.2. | Shipping the ESI pipeline in 0.1 without a consumer. |
 | D8 | Caching | Our own `CacheStore` (memory, disk, tiered), keyed by identity; URLCache disabled | URLCache: opaque and can't key by character. |
@@ -640,10 +640,10 @@ Steps 1–5 are CapsuleerKit repo commits, each passing `swift build` and `swift
 
 1. **Repo and scaffold:**
    - create the public repo `Crazor/CapsuleerKit` (with the user's OK)
-   - `Package.swift`: tools 6.0, macOS 13, iOS 16; products `CapsuleerCore`, `SDEKit`
+   - `Package.swift`: tools 6.0, macOS 13; products `CapsuleerCore`, `SDEKit`
      and `CapsuleerKitTesting`, plus the `capsuleer` CLI
    - LICENSE, README with the CCP notice, CHANGELOG, this DESIGN.md
-   - CI workflow: hosted macOS on push and PR, plus an iOS Simulator build on `main`
+   - CI workflow: hosted macOS on push and PR
 2. **CapsuleerCore transport:** `HTTPRequest` / `HTTPResponse`, `HTTPTransport`,
    `URLSessionTransport`, `UserAgent`, `CapsuleerError`,
    `Clock`, `LogSink` and the built-in sinks, `ClientEvent`; `MockTransport` in

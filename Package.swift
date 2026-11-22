@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CapsuleerKit",
-    platforms: [.macOS(.v13), .iOS(.v16)],
+    platforms: [.macOS(.v13)],
     products: [
         .library(name: "CapsuleerCore", targets: ["CapsuleerCore"]),
         .library(name: "SDEKit", targets: ["SDEKit"]),

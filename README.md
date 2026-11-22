@@ -6,7 +6,7 @@ A Swift package for EVE Online's official developer services:
 - **ESI**, CCP's REST API at `https://esi.evetech.net`, with EVE SSO login (coming in 0.2).
 
 It is a polite client: caching, conditional requests and a descriptive User-Agent are built in,
-not left to the app. Swift 6, async/await, macOS 13 and iOS 16, no dependencies in the library
+not left to the app. Swift 6, async/await, macOS 13, no dependencies in the library
 products.
 
 ## Status
