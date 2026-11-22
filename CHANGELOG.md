@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). During 0.x, minor versions may break the API; each
 break is listed here.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-11-22
 
 ### Changed
 - Building CapsuleerKit now needs Swift 6.2 (Xcode 26), because ESIKit depends on
