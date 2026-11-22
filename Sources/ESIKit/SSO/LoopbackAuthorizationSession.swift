@@ -60,18 +60,23 @@ public struct LoopbackAuthorizationSession: AuthorizationSession {
                     try await Task.sleep(for: timeout)
                     throw CapsuleerError(.ssoFailed, message: "Timed out waiting for the SSO redirect")
                 }
-                defer {
-                    group.cancelAll()
-                    server.stop()
-                }
+                let outcome: Result<URL, any Error>
                 do {
                     guard let url = try await group.next() else {
                         throw CapsuleerError(.ssoFailed, message: "Loopback session ended without a callback")
                     }
-                    return url
+                    outcome = .success(url)
                 } catch is CancellationError {
-                    throw CapsuleerError(.cancelled, message: "Login cancelled", underlying: CancellationError())
+                    outcome = .failure(CapsuleerError(.cancelled, message: "Login cancelled", underlying: CancellationError()))
+                } catch {
+                    outcome = .failure(error)
                 }
+                group.cancelAll()
+                server.stop()
+                // NWListener releases the port asynchronously; wait for it so an immediate retry
+                // (e.g. `capsuleer esi login` after a timeout) can bind the same port again.
+                await server.waitUntilStopped(atMost: .seconds(2))
+                return try outcome.get()
             }
         } onCancel: {
             server.stop(error: CapsuleerError(.cancelled, message: "Login cancelled"))
@@ -90,6 +95,11 @@ private final class LoopbackServer: Sendable {
         var readyWaiters: [CheckedContinuation<Void, any Error>] = []
         var result: Result<URL, CapsuleerError>?
         var resultWaiters: [CheckedContinuation<URL, any Error>] = []
+        /// The listener reached `.cancelled` (or was never created).
+        var stopped = false
+        /// `waitUntilStopped` gave up; late waiters return immediately.
+        var stopWaitAbandoned = false
+        var stopWaiters: [CheckedContinuation<Void, Never>] = []
     }
 
     private let port: NWEndpoint.Port
@@ -137,6 +147,36 @@ private final class LoopbackServer: Sendable {
         finish(.failure(error))
     }
 
+    /// Returns once the listener has released its port, or after `limit`.
+    func waitUntilStopped(atMost limit: Duration) async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    let done = self.state.withLock { state -> Bool in
+                        if state.stopped || state.stopWaitAbandoned { return true }
+                        state.stopWaiters.append(continuation)
+                        return false
+                    }
+                    if done { continuation.resume() }
+                }
+            }
+            group.addTask { try? await Task.sleep(for: limit) }
+            await group.next()
+            group.cancelAll()
+            // Release a waiter left behind by the timeout branch.
+            self.markStopped(timedOut: true)
+        }
+    }
+
+    private func markStopped(timedOut: Bool = false) {
+        let waiters = state.withLock { state -> [CheckedContinuation<Void, Never>] in
+            if timedOut { state.stopWaitAbandoned = true } else { state.stopped = true }
+            defer { state.stopWaiters = [] }
+            return state.stopWaiters
+        }
+        waiters.forEach { $0.resume() }
+    }
+
     private func startIfNeeded() {
         let shouldStart = state.withLock { state in
             defer { state.started = true }
@@ -166,6 +206,8 @@ private final class LoopbackServer: Sendable {
                 return state.readyWaiters
             }
             waiters.forEach { $0.resume() }
+        case .cancelled:
+            markStopped()
         case .failed(let error), .waiting(let error):
             finish(.failure(CapsuleerError(.ssoFailed, message: "Could not listen on 127.0.0.1:\(port.rawValue): \(error)", underlying: error)))
         default:
@@ -242,7 +284,7 @@ private final class LoopbackServer: Sendable {
             defer { listener = nil }
             return listener
         }
-        listener?.cancel()
+        if let listener { listener.cancel() } else { markStopped() }
         for waiter in readyWaiters {
             if case .failure(let error) = result { waiter.resume(throwing: error) } else { waiter.resume() }
         }

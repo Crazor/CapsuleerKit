@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). During 0.x, minor versions may break the API; each
 break is listed here.
 
+## [Unreleased]
+
+### Fixed
+- `LoopbackAuthorizationSession` waits until its listener has released the port before
+  returning, so a login retried right after a timeout can bind the same port again.
+
 ## [0.2.0] - 2026-11-22
 
 ### Changed
