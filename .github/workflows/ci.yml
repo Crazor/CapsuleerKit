@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    # Branches only: a tag points at a commit that already ran CI on main.
+    branches: ['**']
   pull_request:
 
 permissions:

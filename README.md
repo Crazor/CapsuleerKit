@@ -69,7 +69,7 @@ so the data stays available offline.
 
 Register an application at [developers.eveonline.com](https://developers.eveonline.com/) with
 the scopes you need and a callback URL your app can receive (a custom URL scheme such as
-`myapp://sso-callback`, or `http://127.0.0.1:<port>/callback` for a CLI). Native apps use PKCE
+`eveauth-myapp://callback`, or `http://127.0.0.1:<port>/callback` for a CLI). Native apps use PKCE
 and need no client secret.
 
 ```swift
@@ -81,7 +81,7 @@ let cache = TieredCacheStore(directory: cachesURL.appending(path: "ESI"))
 let sso = SSOClient(
     configuration: SSOConfiguration(
         clientID: "<your client ID>",
-        callbackURL: URL(string: "myapp://sso-callback")!,
+        callbackURL: URL(string: "eveauth-myapp://callback")!,
         defaultScopes: [.locationRead, .shipTypeRead, .onlineRead]),
     userAgent: userAgent)
 let tokens = TokenManager(sso: sso, store: KeychainTokenStore(service: "com.example.myapp.eve"), cache: cache)

@@ -5,6 +5,20 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). During 0.x, minor versions may break the API; each
 break is listed here.
 
+## [0.2.1] - 2026-11-22
+
+### Added
+- `SSOConfiguration.isAcceptedCallbackURL(_:)`: the callback URL rules of developers.eveonline.com.
+
+### Fixed
+- `WebAuthenticationSession` crashed (`dispatch_assert_queue_fail`) when
+  `ASWebAuthenticationSession` called back off the main thread, as it does on its early-failure
+  path. Completions now hop to the main actor, and the presentation anchor is captured up front.
+- `WebAuthenticationSession` refuses custom schemes EVE doesn't accept (they must start with
+  `eveauth`), and the docs use `eveauth-…://callback` instead of the invalid `overseer://` examples.
+- `LoopbackAuthorizationSession` waits until its listener has released the port before
+  returning, so a login retried right after a timeout can bind the same port again.
+
 ## [0.2.0] - 2026-11-22
 
 ### Changed
@@ -74,6 +88,7 @@ break is listed here.
 - CI on macOS for every push and pull request, weekly live
   tests, and a weekly upstream watch of the SDE against `Spec/pins.json`.
 
+[0.2.1]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.1
 [0.2.0]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.0
 [0.1.1]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.1.1
 [0.1.0]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.1.0

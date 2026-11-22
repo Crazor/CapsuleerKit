@@ -41,7 +41,7 @@ import CapsuleerKitTesting
         let items = Dictionary((components.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { a, _ in a })
         #expect(items["response_type"] == "code")
         #expect(items["client_id"] == ssoClientID)
-        #expect(items["redirect_uri"] == "overseer://sso-callback")
+        #expect(items["redirect_uri"] == "eveauth-overseer://callback")
         #expect(items["scope"] == "esi-location.read_location.v1 esi-location.read_ship_type.v1")
         #expect(items["code_challenge_method"] == "S256")
         #expect(items["code_challenge"] == PKCE.codeChallenge(for: request.codeVerifier))
@@ -50,7 +50,7 @@ import CapsuleerKitTesting
         #expect(request.scopes == [.locationRead, .shipTypeRead])
         // Spaces are %20, and the redirect URI's reserved characters are escaped.
         #expect(request.url.absoluteString.contains("scope=esi-location.read_location.v1%20esi-location"))
-        #expect(request.url.absoluteString.contains("redirect_uri=overseer%3A%2F%2Fsso-callback"))
+        #expect(request.url.absoluteString.contains("redirect_uri=eveauth-overseer%3A%2F%2Fcallback"))
 
         let other = try await client.makeAuthorizationRequest(scopes: [])
         #expect(other.state != request.state)
@@ -112,16 +112,16 @@ import CapsuleerKitTesting
         let client = server.makeClient()
         let request = try await client.makeAuthorizationRequest(scopes: [])
         let error = await #expect(throws: CapsuleerError.self) {
-            try await client.exchange(callbackURL: URL(string: "overseer://sso-callback?code=x&state=forged")!, for: request)
+            try await client.exchange(callbackURL: URL(string: "eveauth-overseer://callback?code=x&state=forged")!, for: request)
         }
         #expect(error?.code == .ssoFailed)
         #expect(server.tokenRequests.isEmpty)
     }
 
     @Test(arguments: [
-        "overseer://evil-host?code=x&state=S",
+        "eveauth-overseer://evil-host?code=x&state=S",
         "evil://sso-callback?code=x&state=S",
-        "overseer://sso-callback/other?code=x&state=S",
+        "eveauth-overseer://callback/other?code=x&state=S",
     ])
     func wrongCallbackIsRejected(url: String) async throws {
         let server = MockLoginServer()
@@ -148,11 +148,11 @@ import CapsuleerKitTesting
         let client = server.makeClient()
         let request = try await client.makeAuthorizationRequest(scopes: [])
         let denied = await #expect(throws: CapsuleerError.self) {
-            try await client.exchange(callbackURL: URL(string: "overseer://sso-callback?error=access_denied&state=\(request.state)")!, for: request)
+            try await client.exchange(callbackURL: URL(string: "eveauth-overseer://callback?error=access_denied&state=\(request.state)")!, for: request)
         }
         #expect(denied?.code == .cancelled)
         let other = await #expect(throws: CapsuleerError.self) {
-            try await client.exchange(callbackURL: URL(string: "overseer://sso-callback?error=server_error&state=\(request.state)")!, for: request)
+            try await client.exchange(callbackURL: URL(string: "eveauth-overseer://callback?error=server_error&state=\(request.state)")!, for: request)
         }
         #expect(other?.code == .ssoFailed)
         #expect(server.tokenRequests.isEmpty)
