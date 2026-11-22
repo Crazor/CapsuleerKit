@@ -230,7 +230,9 @@ public protocol HTTPTransport: Sendable {
   - The app passes the directory. Overseer would use
     `~/Library/Caches/<bundle id>/CapsuleerKit/`.
 - **Freshness:**
-  - An entry is fresh until `Expires`, or `Date + max-age`, whichever is present.
+  - An entry is fresh until `now + max-age − Age` (`Cache-Control: max-age`, `immutable`), otherwise
+    until `Expires`. `no-cache` stores the entry but always revalidates. A response without
+    freshness information is stored only if it has an `ETag` or `Last-Modified`.
   - `no-store` responses are never written.
   - Authenticated responses go only to stores the app has marked as allowed to hold private data.
     The default disk store allows it, since it lives in the user's own container.
@@ -478,7 +480,8 @@ let systems = try await sde.solarSystems()            // SolarSystemTable, synce
   across releases, and the `_changes` table can enable incremental updates later.
 - **Pin the release.** All downloads in one sync use the same release URL, never `latest`, so
   one sync can't mix two releases.
-- **Persistence:** `SDEStore` protocol, which keeps the raw JSONL plus a compact decoded form.
+- **Persistence:** `SDEStore` protocol, which keeps the decoded table with its release and version
+  hash (not the raw JSONL). Table downloads bypass the HTTP cache.
   `DiskSDEStore` writes it to the app-chosen directory, which should be Application Support,
   not Caches, so it stays available offline. A sync replaces data atomically.
 - **Offline:** if the release check or a download fails, the last stored table is used and

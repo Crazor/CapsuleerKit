@@ -1,0 +1,29 @@
+name: Live tests
+
+# Hits the real SDE (and from 0.2, public ESI). A handful of requests per run, at most weekly
+# plus manual runs. No secrets are used.
+on:
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-tests
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: Live tests (macOS)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: Live tests
+        env:
+          CAPSULEER_LIVE: "1"
+        run: swift test --filter LiveTests
