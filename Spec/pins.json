@@ -1,0 +1,9 @@
+{
+  "sde": {
+    "release": "20261120T165826Z",
+    "buildNumber": 3724492,
+    "tables": {
+      "mapSolarSystems": "c9606848f70d51100dbeedd5a9006c7bee71962f389754ad9d3d929015fc4e78"
+    }
+  }
+}

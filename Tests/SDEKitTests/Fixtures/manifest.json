@@ -1,0 +1,92 @@
+{
+ "release": "20261120T165826Z",
+ "buildNumber": 3724492,
+ "releaseDate": "2026-11-20T16:58:26Z",
+ "tables": {
+  "_changes": {
+   "version": "00ca09e931b7a1b739c82d770f25e9d79b779f9124276d9cf6311c52b7624f47",
+   "flatbuffers": {
+    "binaryUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.fb",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.fbs",
+    "binarySchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.bfbs"
+   },
+   "jsonl": {
+    "url": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.jsonl",
+    "recordSchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.schema.json"
+   },
+   "record": {
+    "urlTemplate": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes/{key}.json",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes.schema.json",
+    "exampleUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_changes/tranquility@20261119T110708Z.json"
+   }
+  },
+  "_sde": {
+   "version": "d936bffacc4dc1528a0e601985fe3ccb87acab253289fbda68ddc9232738bc0c",
+   "flatbuffers": {
+    "binaryUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.fb",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.fbs",
+    "binarySchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.bfbs"
+   },
+   "jsonl": {
+    "url": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.jsonl",
+    "recordSchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.schema.json"
+   },
+   "record": {
+    "urlTemplate": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde/{key}.json",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde.schema.json",
+    "exampleUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/_sde/sde.json"
+   }
+  },
+  "mapSolarSystems": {
+   "version": "c9606848f70d51100dbeedd5a9006c7bee71962f389754ad9d3d929015fc4e78",
+   "flatbuffers": {
+    "binaryUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.fb",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.fbs",
+    "binarySchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.bfbs"
+   },
+   "jsonl": {
+    "url": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.jsonl",
+    "recordSchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.schema.json"
+   },
+   "record": {
+    "urlTemplate": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems/{key}.json",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems.schema.json",
+    "exampleUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/mapSolarSystems/30000001.json"
+   }
+  },
+  "npcStations": {
+   "version": "87ba95d01f5360240eda1d10bc5f9bc382a8f21b7dbb1440899a1b052c2b7c5d",
+   "flatbuffers": {
+    "binaryUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.fb",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.fbs",
+    "binarySchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.bfbs"
+   },
+   "jsonl": {
+    "url": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.jsonl",
+    "recordSchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.schema.json"
+   },
+   "record": {
+    "urlTemplate": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations/{key}.json",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations.schema.json",
+    "exampleUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/npcStations/60000004.json"
+   }
+  },
+  "types": {
+   "version": "0991bb96069340bd860c97d96e57f28aa48e08dee438b1965de3782dcd31163b",
+   "flatbuffers": {
+    "binaryUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types.fb",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types.fbs",
+    "binarySchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types.bfbs"
+   },
+   "jsonl": {
+    "url": "https://sde.evetech.net/tranquility/20261120T165826Z/types.jsonl",
+    "recordSchemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types.schema.json"
+   },
+   "record": {
+    "urlTemplate": "https://sde.evetech.net/tranquility/20261120T165826Z/types/{key}.json",
+    "schemaUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types.schema.json",
+    "exampleUrl": "https://sde.evetech.net/tranquility/20261120T165826Z/types/0.json"
+   }
+  }
+ }
+}
