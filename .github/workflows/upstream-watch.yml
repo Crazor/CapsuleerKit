@@ -43,6 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SDE_RELEASE: ${{ steps.check.outputs.sde_release }}
+          ESI_DATE: ${{ steps.check.outputs.esi_date }}
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/report.md"
@@ -62,7 +63,7 @@ jobs:
 
           issue="$(gh issue list --label upstream --state open --limit 1 --json number --jq '.[0].number // empty')"
           if [ -z "$issue" ]; then
-            gh issue create --title "Upstream changes: SDE $SDE_RELEASE" --label upstream --body-file "$body"
+            gh issue create --title "Upstream changes: SDE $SDE_RELEASE / ESI $ESI_DATE" --label upstream --body-file "$body"
           elif gh issue view "$issue" --json body,comments --jq '.body, .comments[].body' | grep -qF "upstream-report: $digest"; then
             echo "Issue #$issue already has this report; not commenting again."
           else

@@ -125,7 +125,7 @@ what it uses.
 |---|---|
 | `CapsuleerCore` | none |
 | `SDEKit` | none |
-| `ESIKit` | `apple/swift-openapi-runtime` and `apple/swift-openapi-urlsession` (Apache-2.0, both from Apple) |
+| `ESIKit` | `apple/swift-openapi-runtime` (≥ 1.13) and `apple/swift-http-types` (Apache-2.0, both from Apple). No `swift-openapi-urlsession`: `PipelineClientTransport` sends through the CapsuleerCore pipeline. The generator (1.14.4, pinned exactly) lives in the separate `Tools/` package. |
 | `capsuleer` CLI | `apple/swift-argument-parser` |
 
 In 0.1 the only dependency is `swift-argument-parser`, and only for the CLI. The library
@@ -151,7 +151,8 @@ needs it; the code uses no AppKit, so adding `.iOS(.v16)` and an iOS CI job is a
 
 **Language:** Swift 6 language mode with strict concurrency, chosen for compile-time data-race
 checking in the cache, the rate limiter and token refresh. No other Swift 6 feature is required.
-Building the package needs Xcode 16 or later; Overseer can stay in Swift 5 mode.
+Building the package needs Xcode 26 (Swift 6.2), because swift-openapi-runtime 1.13+ requires
+it; Overseer can stay in Swift 5 language mode.
 
 **Licence:** MIT, matching Overseer. The README carries CCP's notice: EVE Online and the EVE
 logo are registered trademarks of CCP hf., and the project is not affiliated with or endorsed by
@@ -306,7 +307,7 @@ public protocol HTTPTransport: Sendable {
 | Rate-limit buckets | `RateLimiter` actor, keyed by `(group, identity)`: the client ID plus character for authenticated calls, `public` otherwise. Seeded from `x-rate-limit` (max tokens, window) and corrected from each response's `X-Ratelimit-Remaining` / `-Used`. ESI's token cost is 2XX = 2, 3XX = 1, 4XX = 5, 5XX = 0. When remaining tokens fall below a reserve (default 10 %), requests are spaced out over the window instead of bursting. Operations without a group are limited only by the error budget. |
 | Error-limit budget | `ErrorBudget` actor shared by all calls. It tracks `X-Esi-Error-Limit-Remain` and `-Reset`. At or below a floor (default 10), every request waits until the reset. A 420 response sets the budget to 0 until the reset. |
 | `Retry-After` | On 429 or 503: wait the given time, then retry at most once. If the wait is longer than the caller's deadline, throw `.rateLimited(retryAfter:)` instead. |
-| No blind 4XX retries | 400/401/403/404/422 and every other 4XX are never retried. A 401 on an authenticated call triggers one token refresh and one retry, and only if the token was close to expiry. |
+| No blind 4XX retries | 400/401/403/404/422 and every other 4XX are never retried. A 401 on an authenticated call invalidates the access token, gets a new one and retries exactly once. If the fresh token is rejected too, the 401 is thrown and further 401s for that character are thrown without refresh or retry for `unauthorizedCooldown` (default 5 min), so a locked account can't drain the shared error budget. A successful call ends the cooldown. |
 | 5XX and network errors | At most 2 retries with exponential backoff and jitter (1 s, 3 s), only for idempotent GETs and for the POSTs ESI documents as lookups (`/universe/ids`, `/universe/names`). |
 | Pagination (`X-Pages`) | `pages(...)` fetches page 1, then pages 2…N with bounded concurrency (default 3). All pages must report the same `Last-Modified`. If they don't, the data changed mid-read, and the whole set is refetched, up to 2 times, before throwing `.inconsistentPages`. It returns `Response<[T]>`. Built in 0.2, or when the first paged endpoint arrives. |
 | Concurrent duplicates | Identical in-flight requests (same cache key) are coalesced into one network call. |
@@ -326,10 +327,12 @@ let info = try await esi.characters.publicInfo(2112345678)   // GET /characters/
 
 Planned next, when an app needs them:
 
-- `POST /universe/ids` and `POST /universe/names`
-  - Batches of at most 500 items; longer lists are split and the results merged.
-  - Resolved names are cached for 12 hours (ESI's documented server cache), unresolved names for
-    1 hour.
+- `POST /universe/names` (0.2): batches of at most 1000 IDs (the spec's `maxItems`); resolved
+  names are cached per ID for 30 days, in process and in the cache store, so station names work
+  offline. A batch with one invalid ID returns 404 for the whole batch; it is not split.
+- `POST /universe/ids` (0.2): batches of at most 500 names; only exact (case-insensitive) name
+  matches are returned, since ESI also matches tickers. Resolved names are cached 12 hours,
+  unresolved ones 1 hour.
 - `EVEImages.characterPortrait(id, size:)`, a URL helper for CCP's image server
   (`https://images.evetech.net/characters/{id}/portrait?size=…`). The app loads and caches the
   image itself.
@@ -392,8 +395,14 @@ an internal `SignatureVerifier`. There is no JWT dependency. The checks:
 
 - Every character is an independent `AuthorizedCharacter`, holding the ID, name, owner hash,
   granted scopes and state (`.active` or `.needsReauthentication(reason)`).
-- Each character can be authorized with its own scopes. Calling `authorize(scopes:)` again for a
-  character that already exists merges the scopes and replaces its token.
+- Each character can be authorized with its own scopes. EVE grants exactly the scopes in the
+  authorize URL, and which character logs in is only known afterwards, so
+  `authorize(scopes:mergingWith:)` adds a known character's stored scopes to the request. The
+  stored scopes are always the new token's `scp` claim. The replaced refresh token is *not*
+  revoked: EVE's revocation ends the whole grant for the character and application, so it would
+  also kill the new login (verified live 2026-11-22). Only `logout` revokes.
+- A character that needs re-authentication stays stored with an empty refresh token and state
+  `.needsReauthentication(reason)`, so apps can list it and offer a new login.
 - Before sending, an endpoint call checks the operation's required scopes (from
   `OperationMetadata`) against the character's granted scopes. A missing scope throws
   `.missingScope(…)` without making a network request.
@@ -403,7 +412,7 @@ an internal `SignatureVerifier`. There is no JWT dependency. The checks:
 - `TokenStore` protocol, with these implementations:
   - `KeychainTokenStore(service:accessGroup:)`: a generic password item per character, holding
     the refresh token, owner hash and scopes.
-  - `InMemoryTokenStore`, for tests.
+  - `InMemoryTokenStore` (public, in ESIKit), for tests.
   - `FileTokenStore(url:)`, in the CLI target only (not a library product). It is a JSON file
     with mode 0600, used by the live test runner.
 - Access tokens (about 20 minutes) are kept in memory only.
@@ -458,7 +467,7 @@ let online = try await me.online()     // online, last_login, last_logout
 - Cancellation is honoured everywhere, including while waiting on the rate limiter.
 - **Testability:**
   - `CapsuleerKitTesting` provides `MockTransport` (fixture replay plus request assertions),
-    `FixtureRecorder`, `InMemoryTokenStore`, `MemoryCacheStore` and a controllable `Clock`
+    `MemoryCacheStore` and a controllable `ManualTimeSource`
     injected into the cache, the limiter and the token manager.
   - Fixtures are recorded from live public endpoints by `Scripts/record-fixtures.sh`. SSO
     fixtures are hand-written with a test JWKS key pair.
@@ -609,95 +618,8 @@ So 0.1 ships no ESIKit code. ESIKit arrives in 0.2, together with SSO.
 | D12 | CI | Hosted macOS for every push and PR; live authenticated tests (0.2) on an ephemeral self-hosted runner (Tart VM or Linux container, decided in 0.2), triggered only by schedule, dispatch or push to `main` | Refresh token in GitHub secrets: needs write-back on rotation, and leaks are more likely. |
 | D13 | Upstream watch | Weekly job that diffs ESI compatibility dates and changelog and the SDE manifest against `Spec/pins.json`, and opens an issue | Manual checking. |
 | D14 | Logging | Own `LogSink` protocol with `os.Logger` and stderr sinks | swift-log: an extra dependency for little gain. |
-
-## 10. Open questions
-
-1. **User-Agent contact:** with a public repo, `+https://github.com/Crazor/CapsuleerKit` (the
-   library) and the app's own URL are reachable contacts. Overseer's repo is private. Should
-   Overseer's User-Agent carry a public URL, or only the product name plus the library's URL?
-2. ~~**Security display rounding**~~ — resolved 2026-11-22: values above 0.0 and below 0.05
-   show as 0.1 in game (Egbinger 0.0346, Ennur 0.0583); Balle (0.4609) shows 0.5.
-3. **SDE stability:** CCP doesn't call the HTTP SDE beta or stable. Should SDEKit fall back to
-   the zip export at `developers.eveonline.com/static-data` if the HTTP service goes away? The
-   proposal is no fallback in 0.1; keep the stored table and report `isStale`.
-4. **SDE client etiquette:** no rate limits or User-Agent rules are published. The proposal is to
-   send the same User-Agent and stay within one sync per day.
-5. **ESI refresh-token lifetime and rotation:** check against current SSO behaviour when 0.2
-   starts. The design already stores every refresh token returned.
-6. **Keychain access group and sharing** between Overseer builds (debug and release signing):
-   decide in 0.2.
-7. **Generator version pinning:** pin `swift-openapi-generator` exactly in
-   `Tools/Package.resolved`, and allow minor-version updates of `swift-openapi-runtime`.
-8. **Self-hosted runner host:** Docker Desktop, OrbStack or Colima on the user's Mac. Does it need
-   to run around the clock, or are schedule-triggered jobs allowed to queue until the Mac is
-   awake? GitHub drops a queued job after 24 hours.
-9. **Live tests for authenticated location and ship data** need the alt to be logged into the
-   game for meaningful values (online, undocked). The proposal is that CI asserts shape and
-   etiquette only, not specific values.
-
-## 11. Implementation plan
-
-### 0.1 (SDE only)
-
-Steps 1–5 are CapsuleerKit repo commits, each passing `swift build` and `swift test` on macOS.
-
-1. **Repo and scaffold:**
-   - create the public repo `Crazor/CapsuleerKit` (with the user's OK)
-   - `Package.swift`: tools 6.0, macOS 13; products `CapsuleerCore`, `SDEKit`
-     and `CapsuleerKitTesting`, plus the `capsuleer` CLI
-   - LICENSE, README with the CCP notice, CHANGELOG, this DESIGN.md
-   - CI workflow: hosted macOS on push and PR
-2. **CapsuleerCore transport:** `HTTPRequest` / `HTTPResponse`, `HTTPTransport`,
-   `URLSessionTransport`, `UserAgent`, `CapsuleerError`,
-   `Clock`, `LogSink` and the built-in sinks, `ClientEvent`; `MockTransport` in
-   `CapsuleerKitTesting`.
-3. **CapsuleerCore cache:** `CacheKey`, `CacheEntry`, `CacheStore`, the memory, disk and tiered
-   stores, the freshness logic, cache policies, `Response<T>`, conditional requests, 304
-   handling, stale-if-error and request coalescing.
-   - Tests use the controllable clock.
-   - The identity part of the key is already in place for 0.2, even though 0.1 uses only
-     `public`.
-4. **SDEKit:**
-   - code: `SDEClient` (manifest, release pinning, table sync by version hash), `SDEStore` /
-     `DiskSDEStore`, `SolarSystem`, `SolarSystemTable` (lookup by ID and by localised name),
-     `SecurityStatus`, record lookup
-   - tests: fixtures for the manifest and a trimmed `mapSolarSystems.jsonl`
-5. **Live tests, CLI and upstream watch:**
-   - `Tests/LiveTests`: the SDE manifest, one record and the solar-system table download
-   - `capsuleer sde system <name|id>`
-   - `Spec/pins.json` with the SDE release and table versions
-   - `Scripts/check-upstream.sh` and `upstream-watch.yml`: weekly, SDE checks only for now
-   - tag `0.1.0`
-6. **Overseer integration (Overseer repo):**
-   - add the remote package reference pinned to `0.1.0` and link `SDEKit`
-   - create a shared `SDEClient` storing under `~/Library/Application Support/<bundle id>/SDE`
-   - sync at launch in the background
-   - feed the chat-log system name into the status line
-
-### 0.2 (ESIKit, SSO and phase 2)
-
-1. **ESIKit spec tooling:**
-   - `Tools/` package, `Spec/esi-openapi-<date>.json` (newest compatibility date at that time),
-     the ESI pin in `pins.json`, and the filter config with only the operations being built
-   - `Scripts/update-esi-spec.sh`, generated sources committed, `OperationMetadata` generation
-   - a test that the compatibility-date constant matches the generated code
-   - ESI compatibility-date and changelog checks added to the upstream watch
-2. **ESIKit pipeline:**
-   - `PipelineClientTransport`, compatibility date and User-Agent headers, `RateLimiter`,
-     `ErrorBudget`, retry policy and `Retry-After`
-   - `characters.publicInfo` as the first endpoint, with a recorded fixture and a live test
-   - tests: rate-limit header parsing, error budget floor, no 4XX retry, one retry on 503 with
-     `Retry-After`
-3. **SSO core:** `SSOClient` (PKCE, code exchange, refresh, revoke, JWKS and JWT with
-   Security.framework), `TokenStore` with the Keychain and in-memory stores,
-   `TokenManager` with single-flight refresh, and scope checks.
-4. **Login sessions:** `AuthorizationSession`, with `WebAuthenticationSession` (Apple) and
-   `LoopbackAuthorizationSession`; `capsuleer login` with `FileTokenStore`.
-5. **Endpoints:** `location`, `ship` and `online`; `/universe/names` and
-   `/universe/structures/{id}` as needed; the SDE `types` and `npcStations` tables.
-6. **CI:** register the "CapsuleerKit CI" CCP application, log in the alt, choose a Tart VM or
-   a Linux container (adding Linux support if the container wins), set up the ephemeral
-   self-hosted runner and the live authenticated workflow with the guard rails in §7.
-7. **Pagination:** when the first paged endpoint arrives.
-8. **Overseer:** register its own CCP application and URL scheme, add the login UI, and show
-   ship and docked state in the status line.
+| D15 | 0.2 scope | **Everything Overseer phase 2 needs:** ESIKit pipeline, SSO and tokens, `location` / `ship` / `online`, structure names (`esi-universe.read_structures.v1`), station names via `POST /universe/names`, ship type names via SDE `types` records | Splitting into 0.2 and 0.3. |
+| D16 | Names | NPC station names come from ESI `POST /universe/names` (the SDE `npcStations` table has no names). Ship type names come from single SDE `types` records (immutable, cached), not the whole `types` table. | Downloading the full `types` table for a handful of ship names. |
+| D17 | Authenticated live tests | Written in 0.2 and run locally (`capsuleer login`, `CAPSULEER_LIVE_AUTH=1`); the isolated self-hosted runner is a follow-up after 0.2 | Setting up Tart or a Linux container runner inside 0.2. |
+| D18 | Rate-limit plumbing | ESIKit passes the spec's rate-limit group, identity and idempotency to `ESIEtiquetteTransport` as internal request headers (`X-CapsuleerKit-*`), which the transport strips before sending | Task-locals: implicit and fragile across the coalescing task. |
+| D19 | JWT keys | Verify both RS256 and ES256, since EVE's JWKS publishes both | RS256 only. |

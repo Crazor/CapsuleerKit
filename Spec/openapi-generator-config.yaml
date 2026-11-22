@@ -1,0 +1,19 @@
+# swift-openapi-generator configuration for ESIKit (see DESIGN.md §5.1).
+# Used by Scripts/update-esi-spec.sh; output goes to Sources/ESIKit/Generated (committed).
+# Adding an endpoint: add its operationId here, rerun the script, write a facade method and model.
+generate:
+  - types
+  - client
+accessModifier: internal
+namingStrategy: idiomatic
+additionalFileComments:
+  - "Generated from Spec/esi-openapi-<date>.json by Scripts/update-esi-spec.sh. Do not edit by hand."
+filter:
+  operations:
+    - GetCharactersDetail
+    - GetCharactersCharacterIdLocation
+    - GetCharactersCharacterIdShip
+    - GetCharactersCharacterIdOnline
+    - GetUniverseStructuresStructureId
+    - PostUniverseNames
+    - PostUniverseIds

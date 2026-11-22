@@ -15,6 +15,16 @@ public struct ClientEvent: Sendable {
         /// SDE sync events.
         public static let sdeReleaseChecked = Kind(rawValue: "sdeReleaseChecked")
         public static let sdeTableUpdated = Kind(rawValue: "sdeTableUpdated")
+        /// ESI: a request waited for the rate limiter (`duration`, `detail` = group).
+        public static let rateLimitWait = Kind(rawValue: "rateLimitWait")
+        /// ESI: the error budget is at or below its floor; requests pause until reset (`duration`).
+        public static let errorBudgetLow = Kind(rawValue: "errorBudgetLow")
+        /// ESI: a request was retried (`status`, `detail` = reason).
+        public static let retried = Kind(rawValue: "retried")
+        /// SSO: an access token was refreshed (`detail` = character ID, private).
+        public static let tokenRefreshed = Kind(rawValue: "tokenRefreshed")
+        /// SSO: a character needs to log in again (`detail` = character ID).
+        public static let reauthenticationRequired = Kind(rawValue: "reauthenticationRequired")
     }
 
     public var kind: Kind

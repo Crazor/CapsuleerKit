@@ -8,7 +8,7 @@ struct Capsuleer: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "CapsuleerKit dev CLI.",
         version: CapsuleerKitInfo.version,
-        subcommands: [SDE.self])
+        subcommands: [SDE.self, ESICommand.self])
 }
 
 struct SharedOptions: ParsableArguments {

@@ -571,6 +571,62 @@ private func expectError(_ code: CapsuleerError.Code, _ body: () async throws ->
         #expect(await h.cache.entry(for: h.key()) != nil)  // the shared request completed and stored
     }
 
+    @Test func cancellingTheLastCallerCancelsTheSharedRequest() async throws {
+        let h = Harness()
+        let sawCancellation = OSAllocatedUnfairLock(initialState: false)
+        h.transport.setHandler { request in
+            do {
+                try await Task.sleep(for: .seconds(3600))  // e.g. an etiquette wait before sending
+            } catch {
+                sawCancellation.withLock { $0 = true }
+                throw error
+            }
+            return HTTPResponse(status: 200, headers: ["Cache-Control": "max-age=60"], body: Data("unwanted".utf8), url: request.url)
+        }
+        let first = Task { try await h.get() }
+        try await waitUntil { h.client.inFlight.waiterCount == 1 && h.transport.requests.count == 1 }
+
+        first.cancel()
+        await expectError(.cancelled) { _ = try await first.value }
+        try await waitUntil { sawCancellation.withLock { $0 } }
+        #expect(h.client.inFlight.flightCount == 0)
+
+        h.ok("fresh")
+        let response = try await h.get()
+        #expect(response.value.body == Data("fresh".utf8))
+        #expect(h.transport.requests.count == 2)
+    }
+
+    @Test func callerAfterAnAbandonedFlightStartsANewOne() async throws {
+        let h = Harness()
+        let oldGate = Gate(), newGate = Gate()
+        h.transport.setHandler { request in
+            await oldGate.wait()  // ignores cancellation, so the abandoned task outlives its waiter
+            return HTTPResponse(status: 200, headers: ["Cache-Control": "max-age=60"], body: Data("old".utf8), url: request.url)
+        }
+        let first = Task { try await h.get() }
+        try await waitUntil { h.client.inFlight.waiterCount == 1 && h.transport.requests.count == 1 }
+        first.cancel()
+        await expectError(.cancelled) { _ = try await first.value }
+        #expect(h.client.inFlight.flightCount == 0)
+
+        h.transport.setHandler { request in
+            await newGate.wait()
+            return HTTPResponse(status: 200, headers: ["Cache-Control": "max-age=60"], body: Data("new".utf8), url: request.url)
+        }
+        let second = Task { try await h.get(policy: .reloadRevalidatingCacheData) }
+        try await waitUntil { h.client.inFlight.waiterCount == 1 && h.transport.requests.count == 2 }
+
+        // The abandoned flight finishing must not resume the new flight's waiter.
+        await oldGate.open()
+        try await Task.sleep(for: .milliseconds(20))
+        #expect(h.client.inFlight.waiterCount == 1)
+
+        await newGate.open()
+        #expect(try await second.value.value.body == Data("new".utf8))
+        #expect(h.client.inFlight.flightCount == 0)
+    }
+
     @Test func alreadyCancelledCallerThrowsCancelled() async throws {
         let h = Harness()
         h.ok()

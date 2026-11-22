@@ -5,6 +5,35 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). During 0.x, minor versions may break the API; each
 break is listed here.
 
+## [0.2.0] - 2026-11-22
+
+### Changed
+- Building CapsuleerKit now needs Swift 6.2 (Xcode 26), because ESIKit depends on
+  swift-openapi-runtime 1.13 or later.
+
+### Added
+- **ESIKit**: client for CCP's ESI at compatibility date 2026-11-19.
+  - Endpoints: `character(id).publicInfo()`, `.location()`, `.ship()`, `.online()`;
+    `universe.names(_:)`, `universe.ids(_:)`, `universe.structure(_:as:)`.
+  - `ESIEtiquetteTransport`: `X-Compatibility-Date`, rate-limit buckets per group and character,
+    the shared error budget, `Retry-After`, bounded retries for 5XX and network errors only,
+    never retrying other 4XX.
+  - Responses cached per identity; names cached 30 days so station names work offline.
+  - Endpoint types generated with swift-openapi-generator 1.14.4 from the pinned spec
+    (`Scripts/update-esi-spec.sh`), wrapped by hand-written public models.
+- **EVE SSO** in ESIKit: `SSOClient` (authorization code + PKCE, refresh, revoke, JWT validation
+  with RS256 and ES256), `TokenManager` (single-flight refresh, rotation saved first,
+  re-authentication state), `KeychainTokenStore`, `InMemoryTokenStore`,
+  `WebAuthenticationSession` (Apple) and `LoopbackAuthorizationSession`.
+- SDEKit: `SDEType` and `SDEClient.type(_:)` for ship and item type names.
+- CLI: `capsuleer esi login | characters | logout | status | character`.
+- Live tests for public ESI and, with `CAPSULEER_LIVE_AUTH=1`, for authenticated calls.
+- The weekly upstream watch also reports new ESI compatibility dates and changelog entries for
+  the operations in use.
+- New `CapsuleerError` codes (`rateLimited`, `errorLimited`, `missingScope`, `notAuthenticated`,
+  `reauthenticationRequired`, `ssoFailed`, `inconsistentPages`), `retryAfter`, and new
+  `ClientEvent` kinds.
+
 ## [0.1.1] - 2026-11-22
 
 ### Added
@@ -45,5 +74,6 @@ break is listed here.
 - CI on macOS for every push and pull request, weekly live
   tests, and a weekly upstream watch of the SDE against `Spec/pins.json`.
 
+[0.2.0]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.0
 [0.1.1]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.1.1
 [0.1.0]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.1.0
