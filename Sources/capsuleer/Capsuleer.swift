@@ -70,7 +70,7 @@ struct SDE: AsyncParsableCommand {
             }
             let sec = system.security
             print("\(system.name.en) (\(system.id))")
-            print("security:  \(sec.formatted) [\(sec.band.rawValue)]  true \(system.securityStatus)")
+            print("security:  \(sec.formatted) [\(sec.band.rawValue)]  true \(system.securityStatus)  colour \(sec.displayColor.hex)")
             print("region:    \(system.regionID)  constellation: \(system.constellationID)")
             print("sde:       \(table.release)\(table.isStale ? " (stale)" : "")")
         }
