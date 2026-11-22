@@ -41,7 +41,11 @@ public struct LoopbackAuthorizationSession: AuthorizationSession {
             throw CapsuleerError(.ssoFailed, message: "Invalid loopback port \(port)")
         }
         let path = callbackURL.path.isEmpty ? "/" : callbackURL.path
-        let server = LoopbackServer(port: nwPort, path: path, callbackBase: callbackURL)
+        // Callbacks for another login attempt (an old tab, a reload, a double submit) carry a
+        // different `state`; they are answered and ignored so this login keeps waiting.
+        let expectedState = URLComponents(url: authorizeURL, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "state" }?.value
+        let server = LoopbackServer(port: nwPort, path: path, callbackBase: callbackURL, expectedState: expectedState)
         let timeout = self.timeout
         let openURL = self.openURL
 
@@ -91,6 +95,7 @@ private final class LoopbackServer: Sendable {
     private let port: NWEndpoint.Port
     private let path: String
     private let callbackBase: URL
+    private let expectedState: String?
     private let queue = DispatchQueue(label: "CapsuleerKit.LoopbackAuthorizationSession")
     private let state = OSAllocatedUnfairLock(initialState: State())
     /// NWListener is only `Sendable` from macOS 14. It is created, started and cancelled through
@@ -98,10 +103,11 @@ private final class LoopbackServer: Sendable {
     /// lock state is safe on macOS 13 too.
     private let listener = OSAllocatedUnfairLock<NWListener?>(uncheckedState: nil)
 
-    init(port: NWEndpoint.Port, path: String, callbackBase: URL) {
+    init(port: NWEndpoint.Port, path: String, callbackBase: URL, expectedState: String? = nil) {
         self.port = port
         self.path = path
         self.callbackBase = callbackBase
+        self.expectedState = expectedState
     }
 
     func waitUntilReady() async throws {
@@ -194,6 +200,13 @@ private final class LoopbackServer: Sendable {
               let target = URLComponents(string: String(parts[1])), target.path == path else {
             respond(on: connection, status: "404 Not Found", body: "Not found")
             return
+        }
+        if let expectedState {
+            let received = target.queryItems?.first { $0.name == "state" }?.value
+            guard received == expectedState else {
+                respond(on: connection, status: "409 Conflict", body: "<!doctype html><html><head><meta charset=\"utf-8\"><title>EVE SSO</title></head><body><p>This login link belongs to an earlier attempt. Use the latest login window.</p></body></html>")
+                return
+            }
         }
         var components = URLComponents(url: callbackBase, resolvingAgainstBaseURL: false)
         components?.percentEncodedQuery = target.percentEncodedQuery

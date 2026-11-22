@@ -397,7 +397,9 @@ an internal `SignatureVerifier`. There is no JWT dependency. The checks:
 - Each character can be authorized with its own scopes. EVE grants exactly the scopes in the
   authorize URL, and which character logs in is only known afterwards, so
   `authorize(scopes:mergingWith:)` adds a known character's stored scopes to the request. The
-  stored scopes are always the new token's `scp` claim; the replaced refresh token is revoked.
+  stored scopes are always the new token's `scp` claim. The replaced refresh token is *not*
+  revoked: EVE's revocation ends the whole grant for the character and application, so it would
+  also kill the new login (verified live 2026-11-22). Only `logout` revokes.
 - A character that needs re-authentication stays stored with an empty refresh token and state
   `.needsReauthentication(reason)`, so apps can list it and offer a new login.
 - Before sending, an endpoint call checks the operation's required scopes (from

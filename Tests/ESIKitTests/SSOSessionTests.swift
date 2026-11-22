@@ -50,6 +50,24 @@ private func freeLoopbackPort() throws -> UInt16 {
         #expect(favicon.value == 404)
     }
 
+    @Test func ignoresACallbackFromAnotherLoginAttempt() async throws {
+        let port = try freeLoopbackPort()
+        let strayStatus = SSOLocked<Int>(0)
+        let session = LoopbackAuthorizationSession(port: port, timeout: .seconds(10)) { _ in
+            let urlSession = URLSession(configuration: .ephemeral)
+            Task {
+                // An old tab replays the previous attempt's redirect first.
+                let (_, stray) = try await urlSession.data(from: URL(string: "http://127.0.0.1:\(port)/callback?code=old&state=previous")!)
+                strayStatus.set((stray as? HTTPURLResponse)?.statusCode ?? 0)
+                _ = try await urlSession.data(from: URL(string: "http://127.0.0.1:\(port)/callback?code=new&state=current")!)
+            }
+        }
+        let url = try await session.start(authorizeURL: URL(string: "https://login.eveonline.com/v2/oauth/authorize?state=current")!,
+                                          callbackURL: URL(string: "http://127.0.0.1:\(port)/callback")!)
+        #expect(url.query == "code=new&state=current")
+        #expect(strayStatus.value == 409)
+    }
+
     @Test func timesOut() async throws {
         let port = try freeLoopbackPort()
         let session = LoopbackAuthorizationSession(port: port, timeout: .milliseconds(200)) { _ in }

@@ -150,13 +150,9 @@ public actor TokenManager: ESITokenProvider {
                             metadata: ["dropped": lost.map(\.rawValue).sorted().joined(separator: " ")],
                             privateMetadata: ["character": String(id)])
             }
-            // Still holding the lock, so nothing replaced the stored token since the save above;
-            // re-checking guards against ever revoking the token that is in use.
-            let current = try? await currentCredential(id)
-            if !previous.refreshToken.isEmpty, previous.refreshToken != response.refreshToken,
-               previous.refreshToken != current?.refreshToken {
-                try? await sso.revoke(refreshToken: previous.refreshToken)
-            }
+            // The replaced refresh token is deliberately NOT revoked: EVE SSO revocation ends the
+            // whole grant for this character and application, which would kill the login that just
+            // succeeded (verified live on 2026-11-22). The old token is simply forgotten.
         }
         logSink.log(.info, .sso, "Character authorized", privateMetadata: ["character": String(id)])
         return character
@@ -316,9 +312,9 @@ public actor TokenManager: ESITokenProvider {
         }
         rotationSaveFailed.remove(characterID)
 
-        // Logged out or re-authorized meanwhile: don't overwrite; the rotated token is unused.
+        // Logged out or re-authorized meanwhile: don't overwrite. The rotated token is unused, but
+        // revoking it would end the grant and with it a re-login's fresh token, so it is dropped.
         guard generations[characterID, default: 0] == generation else {
-            try? await sso.revoke(refreshToken: response.refreshToken)
             return try superseded(characterID)
         }
         guard response.character.id == characterID else {

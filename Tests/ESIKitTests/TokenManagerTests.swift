@@ -383,7 +383,7 @@ private struct Harness {
         #expect(try await h.store.load(characterID: characterID) == nil)
     }
 
-    @Test func reloginWaitsForARunningRefreshAndRevokesTheRotatedToken() async throws {
+    @Test func reloginWaitsForARunningRefreshAndRevokesNothing() async throws {
         let h = try await Harness()
         let gate = SSOLocked<Bool>(false)
         let loginToken = h.token(scopes: ["esi-location.read_location.v1"])
@@ -405,9 +405,10 @@ private struct Harness {
         gate.set(true)
         _ = try await refresh.value
         _ = try await login.value
-        // The login's credential wins; the token the refresh rotated to is revoked, never the stored one.
+        // The login's credential wins. Nothing is revoked: EVE revocation ends the whole grant,
+        // which would also invalidate the login's fresh token.
         #expect(try await h.store.load(characterID: characterID)?.refreshToken == "refresh-login")
-        #expect(h.server.revokeRequests.map { MockLoginServer.form($0)["token"] } == ["refresh-2"])
+        #expect(h.server.revokeRequests.isEmpty)
         #expect(try await manager.accessToken(for: characterID, requiredScopes: []) == loginToken)
     }
 
@@ -439,8 +440,8 @@ private struct Harness {
         let stored = try #require(try await h.store.load(characterID: characterID))
         #expect(stored.refreshToken == "refresh-b")
         #expect(stored.character.state == .active)
-        // The replaced refresh token is revoked.
-        #expect(MockLoginServer.form(try #require(h.server.revokeRequests.first))["token"] == "refresh-1")
+        // The replaced refresh token is not revoked (revocation would end the new login's grant too).
+        #expect(h.server.revokeRequests.isEmpty)
     }
 
     @Test func reloginRecoversFromNeedsReauthentication() async throws {
