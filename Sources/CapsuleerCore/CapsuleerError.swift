@@ -24,6 +24,20 @@ public struct CapsuleerError: Error, Sendable, CustomStringConvertible {
         public static let storage = Code(rawValue: "storage")
         /// No SDE release could be fetched and nothing is stored locally.
         public static let sdeReleaseUnavailable = Code(rawValue: "sdeReleaseUnavailable")
+        /// ESI rate limit hit (429) and the wait would exceed the caller's patience; see `retryAfter`.
+        public static let rateLimited = Code(rawValue: "rateLimited")
+        /// ESI error limit exhausted (420 or budget at the floor); see `retryAfter`.
+        public static let errorLimited = Code(rawValue: "errorLimited")
+        /// The character's token lacks a scope the endpoint requires. No request was sent.
+        public static let missingScope = Code(rawValue: "missingScope")
+        /// No token is available for the character (never logged in, or logged out).
+        public static let notAuthenticated = Code(rawValue: "notAuthenticated")
+        /// The refresh token was rejected (revoked, password change, character transfer). The user must log in again.
+        public static let reauthenticationRequired = Code(rawValue: "reauthenticationRequired")
+        /// EVE SSO login or token exchange failed (state mismatch, user cancelled, bad JWT, …).
+        public static let ssoFailed = Code(rawValue: "ssoFailed")
+        /// Pages of a paginated response kept changing while being read.
+        public static let inconsistentPages = Code(rawValue: "inconsistentPages")
     }
 
     public var code: Code
@@ -35,13 +49,16 @@ public struct CapsuleerError: Error, Sendable, CustomStringConvertible {
     public var url: URL?
     /// The underlying error, if any.
     public var underlying: (any Error)?
+    /// For `.rateLimited` / `.errorLimited`: how long to wait before trying again.
+    public var retryAfter: Duration?
 
-    public init(_ code: Code, status: Int? = nil, message: String? = nil, url: URL? = nil, underlying: (any Error)? = nil) {
+    public init(_ code: Code, status: Int? = nil, message: String? = nil, url: URL? = nil, underlying: (any Error)? = nil, retryAfter: Duration? = nil) {
         self.code = code
         self.status = status
         self.message = message
         self.url = url
         self.underlying = underlying
+        self.retryAfter = retryAfter
     }
 
     public var description: String {
@@ -50,6 +67,7 @@ public struct CapsuleerError: Error, Sendable, CustomStringConvertible {
         if let message { parts.append("message: \(message)") }
         if let url { parts.append("url: \(url.absoluteString)") }
         if let underlying { parts.append("underlying: \(underlying)") }
+        if let retryAfter { parts.append("retryAfter: \(retryAfter)") }
         return parts.joined(separator: ", ") + ")"
     }
 }
