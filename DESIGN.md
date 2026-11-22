@@ -333,9 +333,13 @@ Planned next, when an app needs them:
 - `POST /universe/ids` (0.2): batches of at most 500 names; only exact (case-insensitive) name
   matches are returned, since ESI also matches tickers. Resolved names are cached 12 hours,
   unresolved ones 1 hour.
-- `EVEImages.characterPortrait(id, size:)`, a URL helper for CCP's image server
-  (`https://images.evetech.net/characters/{id}/portrait?size=…`). The app loads and caches the
-  image itself.
+- Portraits (0.2.2, CapsuleerCore): `EVEImages.characterPortrait(id, size:)` builds
+  `https://images.evetech.net/characters/{id}/portrait?size=…` (sizes 32–1024 as
+  `EVEImages.PortraitSize`). `EVEImageClient` downloads them through the same pipeline as ESI and
+  the SDE (User-Agent, HTTP cache honouring the server's one-hour `Cache-Control` and ETag, stale
+  data offline) and returns `Response<Data>`, or an `NSImage` / `UIImage` (`PlatformImage`) behind
+  `#if canImport(AppKit)` / `UIKit`, with a SwiftUI `Image(platformImage:)` convenience. Unknown
+  IDs get CCP's default silhouette.
 
 ### 5.4 SSO and authenticated calls (0.2; designed now)
 

@@ -19,7 +19,7 @@ versions; breaking changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 | Product | What it does |
 |---|---|
-| `CapsuleerCore` | Shared HTTP pipeline: `HTTPClient`, `URLSessionTransport`, `UserAgent`, memory/disk/tiered cache stores, `LogSink` (`OSLogSink`, `StderrLogSink`), `ClientEvent`, `CapsuleerError`. |
+| `CapsuleerCore` | Shared HTTP pipeline: `HTTPClient`, `URLSessionTransport`, `UserAgent`, memory/disk/tiered cache stores, `LogSink` (`OSLogSink`, `StderrLogSink`), `ClientEvent`, `CapsuleerError`, `EVEImageClient` for character portraits. |
 | `SDEKit` | SDE releases and table sync by version hash, offline storage, `SolarSystem` / `SolarSystemTable` with lookup by ID and localised name, `SecurityStatus` (display value, band, in-game colour), `SDEType`. |
 | `ESIKit` | ESI client with built-in etiquette (compatibility date, rate limits, error budget, retries), per-character caching, EVE SSO (PKCE, JWT validation), `TokenManager`, Keychain token store, login sessions for apps and CLIs. |
 | `CapsuleerKitTesting` | `MockTransport` and a controllable clock for your own tests. |
@@ -106,6 +106,20 @@ Try it from the command line:
 swift run capsuleer esi login --client-id <id>     # app registered with http://127.0.0.1:8635/callback
 swift run capsuleer esi status <character id>
 ```
+
+## Character portraits
+
+```swift
+import CapsuleerCore
+
+let images = EVEImageClient(configuration: .init(userAgent: userAgent,
+                                                 cacheDirectory: cachesURL.appending(path: "Images")))
+let portrait = try await images.characterPortraitImage(characterID, size: .px128)  // NSImage / UIImage
+Image(platformImage: portrait)                                                     // SwiftUI
+```
+
+Portraits are cached for an hour (the image server's `Cache-Control`), then revalidated with
+their ETag; offline, the cached copy is used.
 
 ## ESI and SDE etiquette we follow
 

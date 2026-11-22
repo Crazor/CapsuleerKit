@@ -51,3 +51,20 @@ struct SDELiveTests {
         #expect(repeated.source == .cache)
     }
 }
+
+@Suite("Image server live", .enabled(if: ProcessInfo.processInfo.environment["CAPSULEER_LIVE"] == "1"))
+struct ImageServerLiveTests {
+    @Test func portraitAndDefaultSilhouette() async throws {
+        let client = EVEImageClient(configuration: .init(
+            userAgent: UserAgent(product: "CapsuleerKit-LiveTests", version: CapsuleerKitInfo.version, contact: "+https://github.com/Crazor/CapsuleerKit"),
+            cache: MemoryCacheStore()))
+        let portrait = try await client.characterPortrait(2112625428, size: .px128)
+        #expect(portrait.value.count > 1000)
+        #expect(portrait.expires != nil)
+        let image = try await client.characterPortraitImage(2112625428, size: .px128)
+        #expect(image.size.width == 128)
+        // Unknown IDs get CCP's default silhouette rather than an error.
+        let unknown = try await client.characterPortrait(1, size: .px32)
+        #expect(!unknown.value.isEmpty)
+    }
+}

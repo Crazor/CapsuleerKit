@@ -5,6 +5,19 @@ All notable changes to this project are documented here. The format is based on
 [Semantic Versioning](https://semver.org/). During 0.x, minor versions may break the API; each
 break is listed here.
 
+## [0.2.2] - 2026-11-22
+
+### Added
+- Character portraits from CCP's image server in CapsuleerCore:
+  - `EVEImages.characterPortrait(_:size:)` builds the URL; `EVEImages.PortraitSize` covers the
+    sizes the server serves (32–1024 px).
+  - `EVEImageClient.characterPortrait(_:size:policy:)` downloads through the CapsuleerKit
+    pipeline (User-Agent, HTTP cache honouring the server's one-hour `Cache-Control` and ETag,
+    stale cached data when offline) and returns `Response<Data>`.
+  - `EVEImageClient.characterPortraitImage(_:size:policy:)` returns an `NSImage` (macOS) or
+    `UIImage` (iOS) via `PlatformImage`; `Response<Data>.platformImage` and SwiftUI
+    `Image(platformImage:)` are conveniences.
+
 ## [0.2.1] - 2026-11-22
 
 ### Added
@@ -88,6 +101,7 @@ break is listed here.
 - CI on macOS for every push and pull request, weekly live
   tests, and a weekly upstream watch of the SDE against `Spec/pins.json`.
 
+[0.2.2]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.2
 [0.2.1]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.1
 [0.2.0]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.2.0
 [0.1.1]: https://github.com/Crazor/CapsuleerKit/releases/tag/0.1.1
